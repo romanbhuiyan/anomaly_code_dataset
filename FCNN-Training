@@ -1,0 +1,138 @@
+#import matrix
+import numpy as np
+import graphviz
+import keras
+import sns as sns
+from sklearn.utils import class_weight
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Flatten, Activation, Conv2D, MaxPooling2D, BatchNormalization
+from matplotlib import pyplot as plt
+from sklearn.metrics import multilabel_confusion_matrix, classification_report, confusion_matrix
+
+
+path_to_data = "DATASET"
+
+
+train_test_generate_batches = ImageDataGenerator()
+batch = train_test_generate_batches.flow_from_directory(directory=path_to_data, target_size=(120,120), batch_size=20000)
+imgs, labels = next(batch) #generates batches of data from the path of the directory
+X_train, X_test, y_train, y_test = train_test_split(imgs/255.,labels, train_size=0.8, test_size=0.2) #splits the dataset into training and testing samples with 30% of the overall samples being test data.
+
+
+num_classes = 2
+
+
+model = Sequential()
+
+
+model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(120,120,3)))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Conv2D(16, (3, 3), activation='relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.25))
+model.add(Dropout(0.5))
+model.add(Dense(50, activation='relu'))
+model.add(Dense(num_classes, activation='softmax'))
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+
+# y_train_new = np.argmax(y_train, axis=1)
+# class_weights = class_weight.compute_class_weight('balanced', np.unique(y_train_new), y_train_new)
+
+
+history = model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=5)
+scores = model.evaluate(X_test, y_test)
+
+model.summary()
+y_test_arg=np.argmax(y_test,axis=1)
+Y_pred = np.argmax(model.predict(X_test),axis=1)
+print('Confusion Matrix')
+print(confusion_matrix(y_test_arg, Y_pred))
+
+preds=np.round(model.predict(X_test),0)
+#print('round test labels', preds)
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+print('\nAccuracy: {:.2f}\n'.format(accuracy_score(y_test, preds)))
+
+print('Precision: {:.2f}'.format(precision_score(y_test, preds, average='micro')))
+print('Recall: {:.2f}'.format(recall_score(y_test, preds, average='micro')))
+print('F1-score: {:.2f}\n'.format(f1_score(y_test, preds, average='micro')))
+
+from sklearn.metrics import classification_report
+print('\nClassification Report\n')
+print(classification_report(y_test, preds, target_names=['Anomaly','Normal']))
+
+# visualising the confusion matrix
+# plot the training loss and accuracy
+plt.style.use("ggplot")
+plt.figure()
+plt.plot(history.history["loss"], label="train_loss")
+plt.plot(history.history["val_loss"], label="val_loss")
+plt.plot(history.history["accuracy"], label="train_acc")
+plt.plot(history.history["val_accuracy"], label="val_acc")
+plt.title("Training Loss and Accuracy on Dataset")
+plt.xlabel("Epoch #")
+plt.ylabel("Loss/Accuracy")
+plt.legend(loc="lower left")
+plt.savefig("Result_Shanghai/Accuracy_Loss.png")
+#----------------Addee------------------
+from matplotlib import pyplot as plt
+import seaborn as sns
+
+def plot_confusion_matrix(y_test,y_scores, classNames):
+    y_test=np.argmax(y_test, axis=1)
+    y_scores=np.argmax(y_scores, axis=1)
+    classes = len(classNames)
+    cm = confusion_matrix(y_test, y_scores)
+    print("**** Confusion Matrix ****")
+    print(cm)
+    print("**** Classification Report ****")
+    print(classification_report(y_test, y_scores, target_names=classNames))
+    con = np.zeros((classes,classes))
+    for x in range(classes):
+        for y in range(classes):
+            con[x,y] = cm[x,y]/np.sum(cm[x,:])
+
+    plt.figure(figsize=(40,40))
+    sns.set(font_scale=3.0) # for label size
+    df = sns.heatmap(con, annot=True,fmt='.2', cmap='Blues',xticklabels= classNames , yticklabels= classNames)
+    df.figure.savefig("Result_anomaly/Confusion_Matrix.png")
+
+classNames = ['Anomaly', 'Normal']
+plot_confusion_matrix(y_test,preds, classNames)
+# multi-class classification
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+
+# fit model
+clf = OneVsRestClassifier(LogisticRegression())
+clf.fit(X_train, y_train)
+pred = clf.predict(X_test)
+pred_prob = clf.predict_proba(X_test)
+
+# roc curve for classes
+fpr = {}
+tpr = {}
+thresh = {}
+
+n_class = 2
+
+for i in range(n_class):
+    fpr[i], tpr[i], thresh[i] = roc_curve(y_test, pred_prob[:, i], pos_label=i)
+
+# plotting
+plt.plot(fpr[0], tpr[0], linestyle='--', color='orange', label='Class 0 vs Rest')
+plt.plot(fpr[1], tpr[1], linestyle='--', color='green', label='Class 1 vs Rest')
+#plt.plot(fpr[2], tpr[2], linestyle='--', color='blue', label='Class 2 vs Rest')
+plt.title('Multiclass ROC curve')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive rate')
+plt.legend(loc='best')
+plt.savefig('Multiclass ROC', dpi=300)
