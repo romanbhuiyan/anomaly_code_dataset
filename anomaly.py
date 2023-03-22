@@ -1,11 +1,3 @@
-########CNN with TFLearn (PIL for Image processing)¶
-from PIL import Image
-##support for opening, manipulating, and saving many different image file formats
-import datetime
-import numpy as np
-import os
-from random import shuffle
-
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsRestClassifier
 from tqdm import tqdm
